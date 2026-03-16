@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📸 ถ่ายภาพและบันทึกลงคอม</title>
+    <title>📸 ถ่ายภาพและบันทึกลงคอม (ไฟล์ไม่เกิน 300KB)</title>
     <style>
+        /* คงเดิม */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             text-align: center;
@@ -28,7 +29,7 @@
             margin-top: 20px;
         }
         canvas {
-            display: none; /* ซ่อน canvas ใช้สำหรับประมวลผล */
+            display: none;
         }
         img {
             border-radius: 12px;
@@ -64,10 +65,15 @@
         .download-btn:hover {
             background-color: #2ecc71;
         }
+        .file-size {
+            margin-top: 10px;
+            font-size: 16px;
+            color: #555;
+        }
     </style>
 </head>
 <body>
-    <h1>📷 ถ่ายภาพและบันทึกลงคอมพิวเตอร์</h1>
+    <h1>📷 ถ่ายภาพและบันทึกลงคอมพิวเตอร์ (ไฟล์ไม่เกิน 300KB)</h1>
     <video id="video" autoplay playsinline></video>
     
     <div class="button-group">
@@ -78,20 +84,21 @@
     <div class="preview">
         <h3>ภาพตัวอย่าง</h3>
         <img id="photoPreview" src="#" alt="ภาพที่ถ่ายจะแสดงที่นี่">
+        <div id="fileSizeDisplay" class="file-size"></div>
     </div>
 
     <canvas id="canvas"></canvas>
 
     <script>
-        // ดึง element ต่าง ๆ
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const captureBtn = document.getElementById('captureBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const photoPreview = document.getElementById('photoPreview');
+        const fileSizeDisplay = document.getElementById('fileSizeDisplay');
 
-        let capturedImageBlob = null; // เก็บข้อมูลภาพในรูป Blob
+        let capturedImageBlob = null;
 
         // เริ่มต้นกล้อง
         async function initCamera() {
@@ -101,7 +108,6 @@
                     audio: false 
                 });
                 video.srcObject = stream;
-                // เมื่อวิดีโอพร้อม ให้เปิดปุ่มถ่ายภาพ
                 video.onloadedmetadata = () => {
                     captureBtn.disabled = false;
                 };
@@ -111,50 +117,106 @@
             }
         }
 
-        // ถ่ายภาพ
-        function capturePhoto() {
-            // กำหนดขนาด canvas ให้เท่ากับขนาดวิดีโอที่แสดงจริง
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            // วาดภาพจาก video ลง canvas
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // แปลง canvas เป็น data URL (base64) เพื่อแสดงตัวอย่าง
-            const dataURL = canvas.toDataURL('image/png');
-            photoPreview.src = dataURL;
-
-            // แปลง canvas เป็น Blob เพื่อใช้ดาวน์โหลด
-            canvas.toBlob((blob) => {
-                capturedImageBlob = blob;
-                downloadBtn.disabled = false; // เปิดปุ่มบันทึก
-            }, 'image/png');
+        // ฟังก์ชันสำหรับปรับขนาดและบีบอัดภาพให้ไฟล์ <= 300KB
+        function capturePhotoWithSizeLimit(maxSizeKB = 300) {
+            // กำหนดความละเอียดเริ่มต้น (อาจปรับลดลงถ้าจำเป็น)
+            let targetWidth = video.videoWidth;
+            let targetHeight = video.videoHeight;
+            const maxWidth = 1280; // จำกัดความกว้างสูงสุด 1280px (ปรับได้)
+            
+            // ถ้าเดิมกว้างเกิน maxWidth ให้ย่อขนาดลงตามสัดส่วน
+            if (targetWidth > maxWidth) {
+                targetHeight = Math.round((targetHeight * maxWidth) / targetWidth);
+                targetWidth = maxWidth;
+            }
+            
+            // กำหนดคุณภาพเริ่มต้น
+            let quality = 0.8; // 80%
+            
+            // ฟังก์ชันสำหรับลองสร้าง blob ด้วยขนาดและคุณภาพที่กำหนด
+            const tryCapture = (width, height, q) => {
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(video, 0, 0, width, height);
+                
+                // แสดงตัวอย่าง (ใช้ dataURL คุณภาพสูงเพื่อความคม แต่ไม่เกี่ยวกับไฟล์)
+                const dataURL = canvas.toDataURL('image/jpeg', q);
+                photoPreview.src = dataURL;
+                
+                // สร้าง blob และวัดขนาด
+                return new Promise((resolve) => {
+                    canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, 'image/jpeg', q);
+                });
+            };
+            
+            // ลองครั้งแรกด้วยขนาดและคุณภาพที่ตั้งไว้
+            tryCapture(targetWidth, targetHeight, quality).then((blob) => {
+                let sizeKB = blob.size / 1024;
+                console.log(`ขนาดไฟล์ครั้งแรก: ${sizeKB.toFixed(2)} KB`);
+                
+                // ถ้าเกิน ให้ลดคุณภาพลงเรื่อย ๆ
+                if (sizeKB > maxSizeKB) {
+                    // ปรับคุณภาพลดลงทีละ 0.1 จนกว่า <= maxSizeKB หรือ quality ต่ำกว่า 0.2
+                    const reduceQuality = (q) => {
+                        if (q < 0.2) {
+                            // ถ้าคุณภาพต่ำมากแล้วยังไม่พอ ให้ลดขนาดความละเอียดอีก
+                            if (targetWidth > 800) {
+                                targetWidth = 800;
+                                targetHeight = Math.round((targetHeight * 800) / targetWidth);
+                                return tryCapture(targetWidth, targetHeight, 0.7); // เริ่มใหม่ที่คุณภาพ 0.7
+                            } else {
+                                // ยอมตามที่มี
+                                return blob;
+                            }
+                        }
+                        return tryCapture(targetWidth, targetHeight, q).then(newBlob => {
+                            if (newBlob.size / 1024 <= maxSizeKB) return newBlob;
+                            else return reduceQuality(q - 0.1);
+                        });
+                    };
+                    
+                    reduceQuality(quality - 0.1).then(finalBlob => {
+                        capturedImageBlob = finalBlob;
+                        downloadBtn.disabled = false;
+                        const finalSizeKB = finalBlob.size / 1024;
+                        fileSizeDisplay.textContent = `ขนาดไฟล์: ${finalSizeKB.toFixed(2)} KB (ปรับคุณภาพ/ขนาดให้อยู่ในเกณฑ์)`;
+                        
+                        // อัปเดตตัวอย่างให้ตรงกับ blob (อาจจะเบลอหน่อย แต่ตรงขนาด)
+                        const url = URL.createObjectURL(finalBlob);
+                        photoPreview.src = url;
+                        URL.revokeObjectURL(url);
+                    });
+                } else {
+                    // ไม่เกินแล้ว
+                    capturedImageBlob = blob;
+                    downloadBtn.disabled = false;
+                    fileSizeDisplay.textContent = `ขนาดไฟล์: ${sizeKB.toFixed(2)} KB`;
+                }
+            });
         }
+
+        // เมื่อกดปุ่มถ่ายภาพ เรียกใช้ฟังก์ชันด้านบน
+        captureBtn.addEventListener('click', () => {
+            capturePhotoWithSizeLimit(300);
+        });
 
         // ดาวน์โหลดภาพ
         function downloadPhoto() {
             if (!capturedImageBlob) return;
-
-            // สร้าง URL ชั่วคราวสำหรับ Blob
             const url = URL.createObjectURL(capturedImageBlob);
-            
-            // สร้าง element <a> สำหรับดาวน์โหลด
             const link = document.createElement('a');
             link.href = url;
-            link.download = 'ภาพถ่าย_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.png';
+            link.download = 'ภาพถ่าย_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.jpg';
             document.body.appendChild(link);
             link.click();
-            
-            // ล้างข้อมูลหลังดาวน์โหลด
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }
 
-        // Event listeners
-        captureBtn.addEventListener('click', capturePhoto);
         downloadBtn.addEventListener('click', downloadPhoto);
 
-        // เริ่มทำงานเมื่อโหลดหน้า
         initCamera();
     </script>
 </body>
