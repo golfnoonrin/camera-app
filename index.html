@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📸 ถ่ายภาพและบันทึกลงคอม</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #f0f4f8;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        video, canvas {
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            max-width: 100%;
+            height: auto;
+        }
+        video {
+            width: 640px;
+            background: #000;
+        }
+        .preview {
+            margin-top: 20px;
+        }
+        canvas {
+            display: none; /* ซ่อน canvas ใช้สำหรับประมวลผล */
+        }
+        img {
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            max-width: 100%;
+            max-height: 300px;
+        }
+        .button-group {
+            margin: 20px 0;
+        }
+        button {
+            background-color: #3498db;
+            border: none;
+            color: white;
+            padding: 12px 25px;
+            margin: 0 10px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .download-btn {
+            background-color: #27ae60;
+        }
+        .download-btn:hover {
+            background-color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <h1>📷 ถ่ายภาพและบันทึกลงคอมพิวเตอร์</h1>
+    <video id="video" autoplay playsinline></video>
+    
+    <div class="button-group">
+        <button id="captureBtn" disabled>📸 ถ่ายภาพ</button>
+        <button id="downloadBtn" class="download-btn" disabled>💾 บันทึกภาพ</button>
+    </div>
+
+    <div class="preview">
+        <h3>ภาพตัวอย่าง</h3>
+        <img id="photoPreview" src="#" alt="ภาพที่ถ่ายจะแสดงที่นี่">
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // ดึง element ต่าง ๆ
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const captureBtn = document.getElementById('captureBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const photoPreview = document.getElementById('photoPreview');
+
+        let capturedImageBlob = null; // เก็บข้อมูลภาพในรูป Blob
+
+        // เริ่มต้นกล้อง
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                // เมื่อวิดีโอพร้อม ให้เปิดปุ่มถ่ายภาพ
+                video.onloadedmetadata = () => {
+                    captureBtn.disabled = false;
+                };
+            } catch (err) {
+                alert('ไม่สามารถเข้าถึงกล้องได้: ' + err.message);
+                console.error(err);
+            }
+        }
+
+        // ถ่ายภาพ
+        function capturePhoto() {
+            // กำหนดขนาด canvas ให้เท่ากับขนาดวิดีโอที่แสดงจริง
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // วาดภาพจาก video ลง canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // แปลง canvas เป็น data URL (base64) เพื่อแสดงตัวอย่าง
+            const dataURL = canvas.toDataURL('image/png');
+            photoPreview.src = dataURL;
+
+            // แปลง canvas เป็น Blob เพื่อใช้ดาวน์โหลด
+            canvas.toBlob((blob) => {
+                capturedImageBlob = blob;
+                downloadBtn.disabled = false; // เปิดปุ่มบันทึก
+            }, 'image/png');
+        }
+
+        // ดาวน์โหลดภาพ
+        function downloadPhoto() {
+            if (!capturedImageBlob) return;
+
+            // สร้าง URL ชั่วคราวสำหรับ Blob
+            const url = URL.createObjectURL(capturedImageBlob);
+            
+            // สร้าง element <a> สำหรับดาวน์โหลด
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'ภาพถ่าย_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.png';
+            document.body.appendChild(link);
+            link.click();
+            
+            // ล้างข้อมูลหลังดาวน์โหลด
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // Event listeners
+        captureBtn.addEventListener('click', capturePhoto);
+        downloadBtn.addEventListener('click', downloadPhoto);
+
+        // เริ่มทำงานเมื่อโหลดหน้า
+        initCamera();
+    </script>
+</body>
+</html>
