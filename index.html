@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📸 ถ่ายภาพและบันทึกลงคอม (เปิด/ปิดกล้องได้)</title>
+    <title>📸 ถ่ายภาพ 16:9 และบันทึกลงคอม</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -64,26 +64,25 @@
         .download-btn:hover {
             background-color: #2ecc71;
         }
-        .file-size {
-            margin-top: 10px;
-            font-size: 16px;
-            color: #555;
-        }
-        /* เพิ่มสไตล์สำหรับปุ่ม toggle */
         .toggle-btn {
             background-color: #9b59b6;
         }
         .toggle-btn:hover {
             background-color: #8e44ad;
         }
+        .file-size {
+            margin-top: 10px;
+            font-size: 16px;
+            color: #555;
+        }
     </style>
 </head>
 <body>
-    <h1>📷 ถ่ายภาพและบันทึกลงคอม (เปิด/ปิดกล้องได้)</h1>
+    <h1>📷 ถ่ายภาพสัดส่วน 16:9 และบันทึกลงคอม</h1>
     <video id="video" autoplay playsinline></video>
     
     <div class="button-group">
-        <button id="captureBtn" disabled>📸 ถ่ายภาพ</button>
+        <button id="captureBtn" disabled>📸 ถ่ายภาพ (16:9)</button>
         <button id="toggleCameraBtn" class="toggle-btn">🔛 เปิดกล้อง</button>
     </div>
 
@@ -98,7 +97,6 @@
 
     <script>
         (function() {
-            // DOM elements
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
@@ -108,30 +106,26 @@
             const fileSizeDisplay = document.getElementById('fileSizeDisplay');
             const toggleCameraBtn = document.getElementById('toggleCameraBtn');
 
-            // State variables
-            let capturedImageBlob = null;        // เก็บ blob ของภาพล่าสุด
-            let cameraStream = null;              // เก็บ stream ของกล้อง
-            let isCameraOn = false;                // สถานะกล้องเปิด/ปิด
-            let isCameraLoading = false;           // กันการกดซ้ำขณะกำลังเปิดกล้อง
+            let capturedImageBlob = null;
+            let cameraStream = null;
+            let isCameraOn = false;
+            let isCameraLoading = false;
 
-            // --- ตั้งค่า listener สำหรับ loadedmetadata (รอให้กล้าพร้อมใช้งาน) ---
+            // --- ตั้งค่าเมื่อ metadata โหลดเสร็จ (กล้องพร้อม) ---
             video.onloadedmetadata = () => {
-                // ต่อเมื่อกล้องกำลังเปิดอยู่เท่านั้น ถึงจะ enable ปุ่มถ่ายภาพ
                 if (isCameraOn) {
                     captureBtn.disabled = false;
                 }
             };
 
-            // --- ฟังก์ชันเปิดกล้อง ---
+            // --- เปิดกล้อง ---
             async function startCamera() {
-                // ป้องกันการเรียกซ้ำขณะกำลังโหลด
                 if (isCameraLoading) return;
-                // ถ้ามี stream อยู่แล้ว (กล้องเปิดค้าง) ไม่ต้องทำอะไร
                 if (cameraStream) return;
 
                 isCameraLoading = true;
-                toggleCameraBtn.disabled = true;   // disable ปุ่มระหว่างรอ
-                captureBtn.disabled = true;         // ยังไม่ให้ถ่ายภาพ
+                toggleCameraBtn.disabled = true;
+                captureBtn.disabled = true;
 
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -142,50 +136,35 @@
                     cameraStream = stream;
                     video.srcObject = stream;
                     isCameraOn = true;
-                    
-                    // เปลี่ยนข้อความปุ่มเป็น "ปิดกล้อง"
                     toggleCameraBtn.textContent = '🔛 ปิดกล้อง';
-                    
-                    // หมายเหตุ: captureBtn จะถูก enable โดย video.onloadedmetadata เมื่อ metadata โหลดเสร็จ
-                    // ถ้า metadata โหลดแล้วแต่ยังไม่ enable (กรณีเปิดกล้องสำเร็จและ metadata มาทันที) 
-                    // เราปล่อยให้ onloadedmetadata จัดการ
                     
                 } catch (err) {
                     alert('ไม่สามารถเข้าถึงกล้องได้: ' + err.message);
                     console.error(err);
-                    
                     isCameraOn = false;
                     captureBtn.disabled = true;
-                    toggleCameraBtn.textContent = '🔛 เปิดกล้อง';  // คงข้อความเปิดกล้อง
+                    toggleCameraBtn.textContent = '🔛 เปิดกล้อง';
                 } finally {
                     isCameraLoading = false;
-                    toggleCameraBtn.disabled = false;   // คืนค่าปุ่มให้กดได้
+                    toggleCameraBtn.disabled = false;
                 }
             }
 
-            // --- ฟังก์ชันปิดกล้อง ---
+            // --- ปิดกล้อง ---
             function stopCamera() {
                 if (cameraStream) {
-                    // หยุดทุก track ใน stream
                     cameraStream.getTracks().forEach(track => track.stop());
                     cameraStream = null;
                     video.srcObject = null;
                 }
-                
                 isCameraOn = false;
-                captureBtn.disabled = true;                // ปิดกล้องแล้วห้ามถ่ายภาพ
-                toggleCameraBtn.textContent = '🔛 เปิดกล้อง'; // เปลี่ยนข้อความเป็นเปิดกล้อง
-                
-                // ไม่ลบภาพตัวอย่างหรือ blob เก่า (ผู้ใช้ยังคงดาวน์โหลดภาพเดิมได้)
-                // แต่ถ้าต้องการให้ลบภาพตัวอย่างเมื่อปิดกล้อง ให้ปลดคอมเมนต์ 2 บรรทัดถัดไป
-                // photoPreview.src = '#';
-                // capturedImageBlob = null; downloadBtn.disabled = true;
+                captureBtn.disabled = true;
+                toggleCameraBtn.textContent = '🔛 เปิดกล้อง';
             }
 
-            // --- ฟังก์ชันสลับเปิด/ปิดกล้อง ---
+            // --- สลับสถานะกล้อง ---
             function toggleCamera() {
-                if (isCameraLoading) return; // กำลังเปิดอยู่ ไม่ให้สับสน
-                
+                if (isCameraLoading) return;
                 if (isCameraOn) {
                     stopCamera();
                 } else {
@@ -193,91 +172,139 @@
                 }
             }
 
-            // --- ฟังก์ชันถ่ายภาพและบีบอัดให้ <= 300KB (เหมือนเดิม) ---
-            function capturePhotoWithSizeLimit(maxSizeKB = 300) {
-                // กำหนดความละเอียดเริ่มต้น
-                let targetWidth = video.videoWidth;
-                let targetHeight = video.videoHeight;
-                const maxWidth = 1280; // จำกัดความกว้างสูงสุด
-                
-                // ถ้ากว้างเกิน maxWidth ให้ย่อลงตามสัดส่วน
-                if (targetWidth > maxWidth) {
-                    targetHeight = Math.round((targetHeight * maxWidth) / targetWidth);
-                    targetWidth = maxWidth;
+            // --- คำนวณพื้นที่ครอบตัดให้ได้สัดส่วน 16:9 จากวิดีโอ ---
+            function getCropRegion(videoWidth, videoHeight) {
+                const targetAspect = 16 / 9;
+                let srcW, srcH, srcX, srcY;
+
+                if (videoWidth / videoHeight > targetAspect) {
+                    // วิดีโอกว้างเกินไป → ต้องตัดซ้าย-ขวา
+                    srcH = videoHeight;
+                    srcW = srcH * targetAspect;
+                    srcX = (videoWidth - srcW) / 2;
+                    srcY = 0;
+                } else {
+                    // วิดีโอสูงเกินไป หรือเท่ากันพอดี → ต้องตัดบน-ล่าง
+                    srcW = videoWidth;
+                    srcH = srcW / targetAspect;
+                    srcX = 0;
+                    srcY = (videoHeight - srcH) / 2;
                 }
-                
-                let quality = 0.8; // คุณภาพเริ่มต้น 80%
-                
-                // ฟังก์ชันลอง capture ด้วยขนาดและคุณภาพที่กำหนด
-                const tryCapture = (width, height, q) => {
-                    canvas.width = width;
-                    canvas.height = height;
-                    ctx.drawImage(video, 0, 0, width, height);
-                    
-                    // อัปเดตรูปตัวอย่าง (คุณภาพเต็มเพื่อความคม)
+
+                return { srcX, srcY, srcW, srcH };
+            }
+
+            // --- ฟังก์ชันหลักสำหรับถ่ายภาพและบีบอัดให้ ≤ 300KB (รักษาสัดส่วน 16:9) ---
+            function capturePhotoWithSizeLimit(maxSizeKB = 300) {
+                // รับขนาดจริงจากวิดีโอ
+                const vW = video.videoWidth;
+                const vH = video.videoHeight;
+                if (vW === 0 || vH === 0) {
+                    alert('กล้องยังไม่พร้อม');
+                    return;
+                }
+
+                // คำนวณพื้นที่ครอบตัด 16:9
+                const { srcX, srcY, srcW, srcH } = getCropRegion(vW, vH);
+
+                // กำหนดขนาด output สูงสุด (คงอัตราส่วน 16:9)
+                const MAX_WIDTH = 1280;
+                let outW = Math.min(srcW, MAX_WIDTH);
+                let outH = outW * 9 / 16;   // รักษา 16:9
+
+                // คุณภาพเริ่มต้น
+                let quality = 0.8;
+
+                // ฟังก์ชันลองถ่ายด้วยขนาดและคุณภาพที่กำหนด (ขนาด output = outW * scale, outH * scale)
+                const tryCapture = (scale, q) => {
+                    const currW = Math.round(outW * scale);
+                    const currH = Math.round(outH * scale);
+                    canvas.width = currW;
+                    canvas.height = currH;
+
+                    // วาดภาพโดยครอบตัดให้ได้ 16:9 และปรับขนาดให้พอดี canvas
+                    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, currW, currH);
+
+                    // อัปเดตตัวอย่าง (ใช้คุณภาพเต็ม 1.0 เพื่อความคม แต่ไม่เกี่ยวกับไฟล์)
                     const dataURL = canvas.toDataURL('image/jpeg', 1.0);
                     photoPreview.src = dataURL;
-                    
-                    // สร้าง blob ตามคุณภาพที่ต้องการ
+
+                    // คืนค่า blob ตามคุณภาพที่กำหนด
                     return new Promise((resolve) => {
                         canvas.toBlob((blob) => {
                             resolve(blob);
                         }, 'image/jpeg', q);
                     });
                 };
-                
-                // ลองครั้งแรกด้วยขนาดและคุณภาพที่ตั้งไว้
-                tryCapture(targetWidth, targetHeight, quality).then((blob) => {
+
+                // เริ่มลองที่ scale = 1, quality = 0.8
+                tryCapture(1.0, quality).then((blob) => {
                     let sizeKB = blob.size / 1024;
                     console.log(`ขนาดไฟล์ครั้งแรก: ${sizeKB.toFixed(2)} KB`);
-                    
-                    if (sizeKB > maxSizeKB) {
-                        // ปรับคุณภาพลดลงทีละ 0.1 จนกว่า <= maxSizeKB หรือ quality ต่ำกว่า 0.2
-                        const reduceQuality = (q) => {
-                            if (q < 0.2) {
-                                // ถ้าคุณภาพต่ำมากแล้วยังไม่พอ ให้ลดขนาดความละเอียดอีก
-                                if (targetWidth > 800) {
-                                    targetWidth = 800;
-                                    targetHeight = Math.round((targetHeight * 800) / targetWidth);
-                                    return tryCapture(targetWidth, targetHeight, 0.7); // เริ่มใหม่ที่คุณภาพ 0.7
+
+                    if (sizeKB <= maxSizeKB) {
+                        // ผ่านเกณฑ์
+                        capturedImageBlob = blob;
+                        downloadBtn.disabled = false;
+                        fileSizeDisplay.textContent = `ขนาดไฟล์: ${sizeKB.toFixed(2)} KB (16:9)`;
+                        // อัปเดตรูปตัวอย่างให้ตรงกับ blob (คุณภาพอาจลดลง)
+                        const url = URL.createObjectURL(blob);
+                        photoPreview.src = url;
+                        URL.revokeObjectURL(url);
+                    } else {
+                        // เริ่มลดคุณภาพและ/หรือขนาด
+                        const reduceQualityOrScale = async (currentScale, currentQuality) => {
+                            // ถ้าคุณภาพยังลดได้ (> 0.2) ให้ลดคุณภาพก่อน
+                            if (currentQuality > 0.2) {
+                                const newQuality = currentQuality - 0.1;
+                                const newBlob = await tryCapture(currentScale, newQuality);
+                                if (newBlob.size / 1024 <= maxSizeKB) {
+                                    return { blob: newBlob, scale: currentScale, quality: newQuality };
                                 } else {
-                                    // ยอมตามที่มี
-                                    return blob;
+                                    // ยังเกิน ให้ลดต่อไป
+                                    return reduceQualityOrScale(currentScale, newQuality);
+                                }
+                            } else {
+                                // คุณภาพเหลือ 0.2 แล้วยังเกิน → ลดขนาดลงครึ่งหนึ่ง (scale ลดลง) แล้วเริ่ม quality ใหม่ที่ 0.8
+                                const newScale = currentScale * 0.7; // ลดลง 30% (ไม่ให้เล็กเกินไป)
+                                if (newScale < 0.3) {
+                                    // ถ้าเล็กมากแล้ว ให้ยอมตามที่มี
+                                    const finalBlob = await tryCapture(currentScale, currentQuality);
+                                    return { blob: finalBlob, scale: currentScale, quality: currentQuality };
+                                } else {
+                                    // เริ่มคุณภาพใหม่ที่ 0.8
+                                    const newBlob = await tryCapture(newScale, 0.8);
+                                    if (newBlob.size / 1024 <= maxSizeKB) {
+                                        return { blob: newBlob, scale: newScale, quality: 0.8 };
+                                    } else {
+                                        // ยังเกิน ให้ลดคุณภาพอีก
+                                        return reduceQualityOrScale(newScale, 0.8);
+                                    }
                                 }
                             }
-                            return tryCapture(targetWidth, targetHeight, q).then(newBlob => {
-                                if (newBlob.size / 1024 <= maxSizeKB) return newBlob;
-                                else return reduceQuality(q - 0.1);
-                            });
                         };
-                        
-                        reduceQuality(quality - 0.1).then(finalBlob => {
-                            capturedImageBlob = finalBlob;
+
+                        reduceQualityOrScale(1.0, quality).then((result) => {
+                            capturedImageBlob = result.blob;
                             downloadBtn.disabled = false;
-                            const finalSizeKB = finalBlob.size / 1024;
-                            fileSizeDisplay.textContent = `ขนาดไฟล์: ${finalSizeKB.toFixed(2)} KB (ปรับคุณภาพ/ขนาดให้อยู่ในเกณฑ์)`;
-                            
-                            // อัปเดตรูปตัวอย่างให้ตรงกับ blob (อาจเบลอเล็กน้อย)
-                            const url = URL.createObjectURL(finalBlob);
+                            const finalSizeKB = result.blob.size / 1024;
+                            fileSizeDisplay.textContent = `ขนาดไฟล์: ${finalSizeKB.toFixed(2)} KB (16:9, ปรับให้อยู่ในเกณฑ์)`;
+
+                            const url = URL.createObjectURL(result.blob);
                             photoPreview.src = url;
                             URL.revokeObjectURL(url);
                         });
-                    } else {
-                        // ไม่เกินเกณฑ์
-                        capturedImageBlob = blob;
-                        downloadBtn.disabled = false;
-                        fileSizeDisplay.textContent = `ขนาดไฟล์: ${sizeKB.toFixed(2)} KB`;
                     }
                 });
             }
 
-            // --- ฟังก์ชันดาวน์โหลดภาพ (เหมือนเดิม) ---
+            // --- ดาวน์โหลดภาพ ---
             function downloadPhoto() {
                 if (!capturedImageBlob) return;
                 const url = URL.createObjectURL(capturedImageBlob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = 'ภาพถ่าย_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.jpg';
+                link.download = 'ภาพถ่าย_16-9_' + new Date().toISOString().slice(0,19).replace(/:/g, '-') + '.jpg';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -296,7 +323,7 @@
             downloadBtn.addEventListener('click', downloadPhoto);
             toggleCameraBtn.addEventListener('click', toggleCamera);
 
-            // --- เริ่มต้น: เปิดกล้องอัตโนมัติเมื่อโหลดหน้า ---
+            // --- เริ่มต้นเปิดกล้องอัตโนมัติ ---
             startCamera();
         })();
     </script>
