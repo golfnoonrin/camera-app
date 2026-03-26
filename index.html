@@ -75,6 +75,10 @@
             font-size: 16px;
             color: #555;
         }
+        .loading {
+            display: inline-block;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -110,6 +114,7 @@
             let cameraStream = null;
             let isCameraOn = false;
             let isCameraLoading = false;
+            let currentPreviewUrl = null; // เก็บ URL ของรูปตัวอย่างปัจจุบัน
 
             // --- ตั้งค่าเมื่อ metadata โหลดเสร็จ ---
             video.onloadedmetadata = () => {
@@ -216,74 +221,92 @@
                     return;
                 }
 
-                const vW = video.videoWidth;
-                const vH = video.videoHeight;
+                // แสดงสถานะกำลังถ่ายภาพ
+                captureBtn.disabled = true;
+                captureBtn.textContent = '📸 กำลังถ่าย...';
 
-                // คำนวณพื้นที่ครอบตัด 16:9
-                const { srcX, srcY, srcW, srcH } = getCropRegion(vW, vH);
+                try {
+                    const vW = video.videoWidth;
+                    const vH = video.videoHeight;
 
-                // กำหนดขนาด output สูงสุด (คงอัตราส่วน 16:9)
-                const MAX_WIDTH = 1280;
-                let outW = Math.min(srcW, MAX_WIDTH);
-                let outH = Math.round(outW * 9 / 16);
+                    // คำนวณพื้นที่ครอบตัด 16:9
+                    const { srcX, srcY, srcW, srcH } = getCropRegion(vW, vH);
 
-                // ตั้งค่า canvas ตามขนาด output
-                canvas.width = outW;
-                canvas.height = outH;
+                    // กำหนดขนาด output สูงสุด (คงอัตราส่วน 16:9)
+                    const MAX_WIDTH = 1280;
+                    let outW = Math.min(srcW, MAX_WIDTH);
+                    let outH = Math.round(outW * 9 / 16);
 
-                // วาดภาพที่ครอบตัดและปรับขนาดลง canvas
-                ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+                    // ตั้งค่า canvas ตามขนาด output
+                    canvas.width = outW;
+                    canvas.height = outH;
 
-                // --- เริ่มกระบวนการบีบอัด ---
-                let quality = 0.9;        // เริ่มที่คุณภาพ 90%
-                let step = 0.1;            // ลดลงครั้งละ 10%
-                let minQuality = 0.2;       // คุณภาพต่ำสุดที่ยอมรับ
-                let currentBlob = await getBlobFromCanvas(quality);
-                let currentSizeKB = currentBlob.size / 1024;
+                    // วาดภาพที่ครอบตัดและปรับขนาดลง canvas
+                    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
 
-                // ถ้าไฟล์ใหญ่เกินไป ให้ลดคุณภาพลงเรื่อย ๆ
-                while (currentSizeKB > maxSizeKB && quality > minQuality) {
-                    quality = Math.max(quality - step, minQuality);  // ลดคุณภาพ แต่ไม่ต่ำกว่า minQuality
-                    currentBlob = await getBlobFromCanvas(quality);
-                    currentSizeKB = currentBlob.size / 1024;
-                }
+                    // --- เริ่มกระบวนการบีบอัด ---
+                    let quality = 0.9;        // เริ่มที่คุณภาพ 90%
+                    let step = 0.1;            // ลดลงครั้งละ 10%
+                    let minQuality = 0.2;       // คุณภาพต่ำสุดที่ยอมรับ
+                    let currentBlob = await getBlobFromCanvas(quality);
+                    let currentSizeKB = currentBlob.size / 1024;
 
-                // ถ้ายังใหญ่เกินและคุณภาพต่ำสุดแล้ว ให้ลดขนาดภาพลงอีก
-                if (currentSizeKB > maxSizeKB) {
-                    // ลดขนาดลง 20% แล้วลองใหม่ (คง 16:9)
-                    let scale = 0.8;
-                    while (currentSizeKB > maxSizeKB && outW * scale > 320) { // ไม่ให้เล็กเกินไป
-                        const newW = Math.round(outW * scale);
-                        const newH = Math.round(newW * 9 / 16);
-                        canvas.width = newW;
-                        canvas.height = newH;
-                        ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, newW, newH);
-
-                        // เริ่มคุณภาพใหม่ที่ 0.8
-                        quality = 0.8;
+                    // ถ้าไฟล์ใหญ่เกินไป ให้ลดคุณภาพลงเรื่อย ๆ
+                    while (currentSizeKB > maxSizeKB && quality > minQuality) {
+                        quality = Math.max(quality - step, minQuality);  // ลดคุณภาพ แต่ไม่ต่ำกว่า minQuality
                         currentBlob = await getBlobFromCanvas(quality);
                         currentSizeKB = currentBlob.size / 1024;
+                    }
 
-                        // ถ้ายังเกิน ให้ลดคุณภาพลงอีก
-                        while (currentSizeKB > maxSizeKB && quality > minQuality) {
-                            quality = Math.max(quality - step, minQuality);
+                    // ถ้ายังใหญ่เกินและคุณภาพต่ำสุดแล้ว ให้ลดขนาดภาพลงอีก
+                    if (currentSizeKB > maxSizeKB) {
+                        // ลดขนาดลง 20% แล้วลองใหม่ (คง 16:9)
+                        let scale = 0.8;
+                        while (currentSizeKB > maxSizeKB && outW * scale > 320) { // ไม่ให้เล็กเกินไป
+                            const newW = Math.round(outW * scale);
+                            const newH = Math.round(newW * 9 / 16);
+                            canvas.width = newW;
+                            canvas.height = newH;
+                            ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, newW, newH);
+
+                            // เริ่มคุณภาพใหม่ที่ 0.8
+                            quality = 0.8;
                             currentBlob = await getBlobFromCanvas(quality);
                             currentSizeKB = currentBlob.size / 1024;
+
+                            // ถ้ายังเกิน ให้ลดคุณภาพลงอีก
+                            while (currentSizeKB > maxSizeKB && quality > minQuality) {
+                                quality = Math.max(quality - step, minQuality);
+                                currentBlob = await getBlobFromCanvas(quality);
+                                currentSizeKB = currentBlob.size / 1024;
+                            }
+
+                            scale *= 0.8; // ลดขนาดลงอีกในรอบถัดไปถ้ายังเกิน
                         }
-
-                        scale *= 0.8; // ลดขนาดลงอีกในรอบถัดไปถ้ายังเกิน
                     }
+
+                    // --- บันทึก blob และอัปเดตตัวอย่าง ---
+                    capturedImageBlob = currentBlob;
+                    downloadBtn.disabled = false;
+                    fileSizeDisplay.textContent = `ขนาดไฟล์: ${currentSizeKB.toFixed(2)} KB (16:9)`;
+
+                    // แก้ไข: ลบ URL เดิมก่อนถ้ามี
+                    if (currentPreviewUrl) {
+                        URL.revokeObjectURL(currentPreviewUrl);
+                    }
+                    
+                    // สร้าง URL ใหม่และแสดงภาพ
+                    currentPreviewUrl = URL.createObjectURL(currentBlob);
+                    photoPreview.src = currentPreviewUrl;
+                    
+                } catch (err) {
+                    console.error('ถ่ายภาพล้มเหลว:', err);
+                    alert('เกิดข้อผิดพลาดในการถ่ายภาพ');
+                } finally {
+                    // คืนสถานะปุ่ม
+                    captureBtn.disabled = false;
+                    captureBtn.textContent = '📸 ถ่ายภาพ (16:9)';
                 }
-
-                // --- บันทึก blob และอัปเดตตัวอย่าง ---
-                capturedImageBlob = currentBlob;
-                downloadBtn.disabled = false;
-                fileSizeDisplay.textContent = `ขนาดไฟล์: ${currentSizeKB.toFixed(2)} KB (16:9)`;
-
-                // แสดงภาพตัวอย่างจาก blob ที่ได้ (เป็นภาพที่บีบอัดแล้ว)
-                const previewUrl = URL.createObjectURL(currentBlob);
-                photoPreview.src = previewUrl;
-                URL.revokeObjectURL(previewUrl); // คืนหน่วยความจำหลังจากโหลดเสร็จ
             }
 
             // --- ดาวน์โหลดภาพ ---
